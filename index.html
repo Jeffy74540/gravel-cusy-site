@@ -1,0 +1,116 @@
+
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gravel Cusy Adventures</title>
+</head>
+<body>
+<div class="filtre">
+  <label for="filtreRecherche">Recherche par mot-clé :</label>
+  <input type="text" id="filtreRecherche" oninput="filtrerParcours()" placeholder="Ex: lac, crêtes, forêt">
+</div>
+
+<p id="messageAucun" style="display:none; font-style:italic; color:#c62828;">Sorry, rien ne correspond.</p>
+
+<button onclick="resetFiltres()">Tout afficher</button>
+<script>
+    const map = L.map('map').setView([45.75, 6.0], 9);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    const gpxLayers = {};
+    const gpxFiles = {
+      'route-des-cretes': "route-des-cretes.gpx",
+      'boucle-des-trois-lacs': "boucle-des-trois-lacs.gpx",
+      'sentier-forestier': "sentier-forestier.gpx"
+    };
+
+    const gpxBounds = [];
+
+    Object.entries(gpxFiles).forEach(([key, file]) => {
+      const layer = new L.GPX(file, {
+        async: true,
+        marker_options: {
+          startIconUrl: 'https://unpkg.com/leaflet-gpx/pin-icon-start.png',
+          endIconUrl: 'https://unpkg.com/leaflet-gpx/pin-icon-end.png',
+          shadowUrl: 'https://unpkg.com/leaflet-gpx/pin-shadow.png'
+        }
+      }).on('loaded', function(e) {
+        gpxBounds[key] = e.target.getBounds();
+        map.fitBounds(e.target.getBounds());
+      }).addTo(map);
+      gpxLayers[key] = layer;
+    });
+
+    function toggleTrace(name) {
+      if (map.hasLayer(gpxLayers[name])) {
+        map.removeLayer(gpxLayers[name]);
+      } else {
+        map.addLayer(gpxLayers[name]);
+        if (gpxBounds[name]) {
+          map.fitBounds(gpxBounds[name]);
+        }
+      }
+    }
+
+    function filtrerParcours() {
+      const diff = document.getElementById("filtreDifficulte").value;
+      const dist = document.getElementById("filtreDistance").value;
+      const terrain = document.getElementById("filtreTerrain").value;
+      const motCle = document.getElementById("filtreRecherche").value.toLowerCase();
+
+      const parcours = document.querySelectorAll(".parcours");
+
+      let boundsArray = [];
+      let visibleCount = 0;
+
+      parcours.forEach(item => {
+        const d = item.dataset.difficulte;
+        const km = item.dataset.distance;
+        const t = item.dataset.terrain;
+        const trace = item.dataset.trace;
+
+        const matchDiff = (diff === "tous" || diff === d);
+        const matchDist = (dist === "tous" || dist === km);
+        const matchTerrain = (terrain === "tous" || terrain === t);
+        const contenuTextuel = item.textContent.toLowerCase();
+        const matchMotCle = contenuTextuel.includes(motCle);
+        const visible = (matchDiff && matchDist && matchTerrain && matchMotCle);
+
+        item.style.display = visible ? "block" : "none";
+        if (visible) visibleCount++;
+
+        const traceCheckbox = document.getElementById("trace-" + trace);
+        if (gpxLayers[trace]) {
+          if (visible && (!traceCheckbox || traceCheckbox.checked)) {
+            map.addLayer(gpxLayers[trace]);
+            if (gpxBounds[trace]) {
+              boundsArray.push(gpxBounds[trace]);
+            }
+          } else {
+            map.removeLayer(gpxLayers[trace]);
+          }
+        }
+      });
+
+      document.getElementById("messageAucun").style.display = visibleCount === 0 ? "block" : "none";
+
+      if (boundsArray.length > 0) {
+        const groupBounds = boundsArray.reduce((acc, b) => acc.extend(b), boundsArray[0]);
+        map.fitBounds(groupBounds);
+      }
+    }
+
+    function resetFiltres() {
+      document.getElementById("filtreDifficulte").value = "tous";
+      document.getElementById("filtreDistance").value = "tous";
+      document.getElementById("filtreTerrain").value = "tous";
+      document.getElementById("filtreRecherche").value = "";
+      filtrerParcours();
+    }
+</script>
+</body>
+</html>
